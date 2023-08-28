@@ -40,6 +40,17 @@ class HumobFormatter(GenericDataFormatter):
       column_definition: Defines input and data type of column used in the
         experiment.
       identifiers: Entity identifiers used in experiments.
+
+            (
+            "x",
+            DataTypes.REAL_VALUED,
+            InputTypes.TARGET,
+        ),  # 待定，这里是否应该(x,y)合为一个categorical变量
+        (
+            "y",
+            DataTypes.REAL_VALUED,
+            InputTypes.TARGET,
+        ),  # 待定，这里是否应该(x,y)合为一个categorical变量
     """
 
     _column_definition = [
@@ -55,21 +66,8 @@ class HumobFormatter(GenericDataFormatter):
             "location_id",
             DataTypes.CATEGORICAL,
             InputTypes.TARGET,
-        ),  # 待定，tft貌似能吸收很多input变量
+        ),  # 地点ID
     ]
-
-    """
-        (
-            "x",
-            DataTypes.REAL_VALUED,
-            InputTypes.TARGET,
-        ),  # 待定，这里是否应该(x,y)合为一个categorical变量
-        (
-            "y",
-            DataTypes.REAL_VALUED,
-            InputTypes.TARGET,
-        ),  # 待定，这里是否应该(x,y)合为一个categorical变量
-    """
 
     def __init__(self):
         """Initialises formatter."""
@@ -81,7 +79,7 @@ class HumobFormatter(GenericDataFormatter):
         self._num_classes_per_cat_input = None
         self._time_steps = self.get_fixed_params()["total_time_steps"]
 
-    def split_data(self, df, valid_boundary=55, test_boundary=60):
+    def split_data(self, df, valid_boundary=53, test_boundary=60):
         """Splits data frame into training-validation-test data frames.
         按照时间维度划分而非用户维度, 相关资料见notion, 需讨论
         0-74天
@@ -102,9 +100,9 @@ class HumobFormatter(GenericDataFormatter):
         index = df["d"]  # 因此需要保留原有的d column，这里需要依次做划分
         train = df.loc[index < valid_boundary]
         valid = df.loc[(index >= valid_boundary) & (index < test_boundary)]
-        test = df.loc[index >= test_boundary]
+        test = df.loc[(index >= test_boundary) & (index < 75)]
 
-        self.set_scalers(train)
+        self.set_scalers(df)
 
         return (self.transform_inputs(data) for data in [train, valid, test])
 
@@ -121,9 +119,9 @@ class HumobFormatter(GenericDataFormatter):
         id_column = utils.get_single_col_by_input_type(
             InputTypes.ID, column_definitions
         )
-        target_column = utils.get_single_col_by_input_type(
-            InputTypes.TARGET, column_definitions
-        )
+        # target_column = utils.get_single_col_by_input_type(
+        # InputTypes.TARGET, column_definitions
+        # )
 
         # Format real scalers
         real_inputs = utils.extract_cols_from_data_type(
@@ -132,19 +130,19 @@ class HumobFormatter(GenericDataFormatter):
 
         # Initialise scaler caches
         self._real_scalers = {}
-        self._target_scaler = {}
+        # self._target_scaler = {}
         identifiers = []
         for identifier, sliced in df.groupby(id_column):
             if len(sliced) >= self._time_steps:
                 data = sliced[real_inputs].values
-                targets = sliced[[target_column]].values
+                # targets = sliced[[target_column]].values
                 self._real_scalers[
                     identifier
                 ] = sklearn.preprocessing.StandardScaler().fit(data)
 
-                self._target_scaler[
-                    identifier
-                ] = sklearn.preprocessing.StandardScaler().fit(targets)
+                # self._target_scaler[
+                # identifier
+                # ] = sklearn.preprocessing.StandardScaler().fit(targets)
             identifiers.append(identifier)
 
         # Format categorical scalers
@@ -164,6 +162,7 @@ class HumobFormatter(GenericDataFormatter):
 
         # Set categorical scaler outputs
         self._cat_scalers = categorical_scalers
+        self._target_scaler = categorical_scalers
         self._num_classes_per_cat_input = num_classes
 
         # Extract identifiers in case required
@@ -205,9 +204,6 @@ class HumobFormatter(GenericDataFormatter):
                     sliced_copy[real_inputs].values
                 )
                 df_list.append(sliced_copy)
-
-        # debug
-        print("Length of df_list:", len(df_list))
 
         output = pd.concat(df_list, axis=0)
 
@@ -253,7 +249,7 @@ class HumobFormatter(GenericDataFormatter):
         """Returns fixed model parameters for experiments."""
 
         fixed_params = {
-            "total_time_steps": 8 * 24,  # 目前不懂这里设置的意义
+            "total_time_steps": 1,  # 作为有效数据的最低时间点数量，对三个数据集同样
             "num_encoder_steps": 7 * 24,
             "num_epochs": 100,
             "early_stopping_patience": 5,
