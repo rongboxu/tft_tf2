@@ -45,18 +45,6 @@ class HumobFormatter(GenericDataFormatter):
     _column_definition = [
         ("uid", DataTypes.REAL_VALUED, InputTypes.ID),  # 用户唯一ID
         ("datatime", DataTypes.DATE, InputTypes.TIME),  # 时间的指标
-        """
-        (
-            "x",
-            DataTypes.REAL_VALUED,
-            InputTypes.TARGET,
-        ),  # 待定，这里是否应该(x,y)合为一个categorical变量
-        (
-            "y",
-            DataTypes.REAL_VALUED,
-            InputTypes.TARGET,
-        ),  # 待定，这里是否应该(x,y)合为一个categorical变量
-        """
         # ("poi", DataTypes.REAL_VALUED, InputTypes.KNOWN_INPUT),  # 待定为poi相关变量
         (
             "d",
@@ -69,6 +57,19 @@ class HumobFormatter(GenericDataFormatter):
             InputTypes.TARGET,
         ),  # 待定，tft貌似能吸收很多input变量
     ]
+
+    """
+        (
+            "x",
+            DataTypes.REAL_VALUED,
+            InputTypes.TARGET,
+        ),  # 待定，这里是否应该(x,y)合为一个categorical变量
+        (
+            "y",
+            DataTypes.REAL_VALUED,
+            InputTypes.TARGET,
+        ),  # 待定，这里是否应该(x,y)合为一个categorical变量
+    """
 
     def __init__(self):
         """Initialises formatter."""
@@ -204,6 +205,9 @@ class HumobFormatter(GenericDataFormatter):
                     sliced_copy[real_inputs].values
                 )
                 df_list.append(sliced_copy)
+
+        # debug
+        print("Length of df_list:", len(df_list))
 
         output = pd.concat(df_list, axis=0)
 
