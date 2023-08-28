@@ -14,7 +14,7 @@
 # limitations under the License.
 
 # Lint as: python3
-"""Custom formatting functions for Electricity dataset.
+"""Custom formatting functions for humob dataset.
 
 Defines dataset specific column definitions and data transformations. Uses
 entity specific z-score normalization.
@@ -30,8 +30,8 @@ DataTypes = data_formatters.base.DataTypes
 InputTypes = data_formatters.base.InputTypes
 
 
-class ElectricityFormatter(GenericDataFormatter):
-    """Defines and formats data for the electricity dataset.
+class HumobFormatter(GenericDataFormatter):
+    """Defines and formats data for the humob dataset.
 
     Note that per-entity z-score normalization is used here, and is implemented
     across functions.
@@ -43,13 +43,31 @@ class ElectricityFormatter(GenericDataFormatter):
     """
 
     _column_definition = [
-        ("id", DataTypes.REAL_VALUED, InputTypes.ID),
-        ("hours_from_start", DataTypes.REAL_VALUED, InputTypes.TIME),
-        ("power_usage", DataTypes.REAL_VALUED, InputTypes.TARGET),
-        ("hour", DataTypes.REAL_VALUED, InputTypes.KNOWN_INPUT),
-        ("day_of_week", DataTypes.REAL_VALUED, InputTypes.KNOWN_INPUT),
-        ("hours_from_start", DataTypes.REAL_VALUED, InputTypes.KNOWN_INPUT),
-        ("categorical_id", DataTypes.CATEGORICAL, InputTypes.STATIC_INPUT),
+        ("uid", DataTypes.REAL_VALUED, InputTypes.ID),  # 用户唯一ID
+        ("datatime", DataTypes.DATE, InputTypes.TIME),  # 时间的指标
+        """
+        (
+            "x",
+            DataTypes.REAL_VALUED,
+            InputTypes.TARGET,
+        ),  # 待定，这里是否应该(x,y)合为一个categorical变量
+        (
+            "y",
+            DataTypes.REAL_VALUED,
+            InputTypes.TARGET,
+        ),  # 待定，这里是否应该(x,y)合为一个categorical变量
+        """
+        # ("poi", DataTypes.REAL_VALUED, InputTypes.KNOWN_INPUT),  # 待定为poi相关变量
+        (
+            "d",
+            DataTypes.REAL_VALUED,
+            InputTypes.KNOWN_INPUT,
+        ),  # 待定，tft貌似能吸收很多input变量
+        (
+            "location_id",
+            DataTypes.CATEGORICAL,
+            InputTypes.TARGET,
+        ),  # 待定，tft貌似能吸收很多input变量
     ]
 
     def __init__(self):
@@ -62,16 +80,17 @@ class ElectricityFormatter(GenericDataFormatter):
         self._num_classes_per_cat_input = None
         self._time_steps = self.get_fixed_params()["total_time_steps"]
 
-    # def split_data(self, df, valid_boundary=100, test_boundary=120):
-    def split_data(self, df, valid_boundary=1315, test_boundary=1339):
+    def split_data(self, df, valid_boundary=55, test_boundary=60):
         """Splits data frame into training-validation-test data frames.
+        按照时间维度划分而非用户维度, 相关资料见notion, 需讨论
+        0-74天
 
         This also calibrates scaling object, and transforms data for each split.
 
         Args:
           df: Source data frame to split.
-          valid_boundary: Starting year for validation data
-          test_boundary: Starting year for test data
+          valid_boundary: Starting day for validation data
+          test_boundary: Starting day for test data
 
         Returns:
           Tuple of transformed (train, valid, test) data.
@@ -79,17 +98,18 @@ class ElectricityFormatter(GenericDataFormatter):
 
         print("Formatting train-valid-test splits.")
 
-        index = df["days_from_start"]
+        index = df["d"]  # 因此需要保留原有的d column，这里需要依次做划分
         train = df.loc[index < valid_boundary]
-        valid = df.loc[(index >= valid_boundary - 7) & (index < test_boundary)]
-        test = df.loc[index >= test_boundary - 7]
+        valid = df.loc[(index >= valid_boundary) & (index < test_boundary)]
+        test = df.loc[index >= test_boundary]
 
         self.set_scalers(train)
 
         return (self.transform_inputs(data) for data in [train, valid, test])
 
     def set_scalers(self, df):
-        """Calibrates scalers using the data supplied. #归一化
+        """Calibrates scalers using the data supplied.
+        归一化
 
         Args:
           df: Data to use to calibrate scalers.
@@ -229,7 +249,7 @@ class ElectricityFormatter(GenericDataFormatter):
         """Returns fixed model parameters for experiments."""
 
         fixed_params = {
-            "total_time_steps": 8 * 24,
+            "total_time_steps": 8 * 24,  # 目前不懂这里设置的意义
             "num_encoder_steps": 7 * 24,
             "num_epochs": 100,
             "early_stopping_patience": 5,
@@ -262,5 +282,4 @@ class ElectricityFormatter(GenericDataFormatter):
         Returns:
           Tuple of (training samples, validation samples)
         """
-        # return 5000, 1000
         return 450000, 50000

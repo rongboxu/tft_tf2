@@ -19,8 +19,8 @@
 
 # Modifiable experiment options.
 # Expt options include {volatility, electricity, traffic, favorita}
-EXPT=traffic
-OUTPUT_FOLDER=~/tft_outputs  # Path to store data & experiment outputs
+EXPT=electricity
+OUTPUT_FOLDER=../tft_outputs  # Path to store data & experiment outputs
 USE_GPU=no
 TESTING_MODE=yes  # If yes, trains a small model with little data to test script
 
@@ -31,19 +31,21 @@ echo
 
 set -e
 
-pip3 install virtualenv # Assumes pip3 is installed!
-python3 -m virtualenv $OUTPUT_FOLDER/venv
+python3 -m venv $OUTPUT_FOLDER/venv
 source $OUTPUT_FOLDER/venv/bin/activate
-pip3 install --pre "tensorflow==1.15.*"
+
+pip3 install --upgrade pip
+pip3 install --upgrade tensorflow
+#pip3 install --pre "tensorflow"
 pip3 install -r requirements.txt
 
 # Step 2: Downloads data if not present.
-echo
-python3 -m script_download_data $EXPT $OUTPUT_FOLDER
+#echo
+#python3 -m script_download_data $EXPT $OUTPUT_FOLDER
 
 # Step 3: Train & Test
-echo
-python3 -m script_train_fixed_params $EXPT $OUTPUT_FOLDER $USE_GPU $TEST_MODE
+#echo
+#python3 -m script_train_fixed_params $EXPT $OUTPUT_FOLDER $USE_GPU $TEST_MODE
 
 # Uncomment below for full hyperparamter optimisation.
 # python3 -m script_hyperparam_opt $EXPT $OUTPUT_FOLDER $USE_GPU yes
