@@ -19,10 +19,10 @@
 
 # Modifiable experiment options.
 # Expt options include {volatility, electricity, traffic, favorita}
-EXPT=electricity
-OUTPUT_FOLDER=../tft_outputs  # Path to store data & experiment outputs
-USE_GPU=no
-TESTING_MODE=yes  # If yes, trains a small model with little data to test script
+EXPT = humob
+OUTPUT_FOLDER = ../tft_outputs  # Path to store data & experiment outputs
+USE_GPU = no
+TESTING_MODE = no  # If yes, trains a small model with little data to test script
 
 # Step 1: Setup environment.
 echo

@@ -67,6 +67,11 @@ class HumobFormatter(GenericDataFormatter):
             DataTypes.CATEGORICAL,
             InputTypes.TARGET,
         ),  # 地点ID
+        (
+            "categorical_id",
+            DataTypes.CATEGORICAL,
+            InputTypes.STATIC_INPUT,
+        ),  # 用户id作为静态输入
     ]
 
     def __init__(self):
@@ -249,8 +254,10 @@ class HumobFormatter(GenericDataFormatter):
         """Returns fixed model parameters for experiments."""
 
         fixed_params = {
-            "total_time_steps": 1,  # 作为有效数据的最低时间点数量，对三个数据集同样
-            "num_encoder_steps": 7 * 24,
+            "total_time_steps": 75 * 48,  # 作为有效数据的最低时间点数量，对三个数据集同样
+            # 需要学习的过去的时间点数 + 需要预测的时间点数
+            # 需要补全”不动“的时间戳
+            "num_encoder_steps": 60 * 48,
             "num_epochs": 100,
             "early_stopping_patience": 5,
             "multiprocessing_workers": 5,
@@ -265,7 +272,8 @@ class HumobFormatter(GenericDataFormatter):
             "dropout_rate": 0.1,
             "hidden_layer_size": 160,
             "learning_rate": 0.001,
-            "minibatch_size": 64,
+            "minibatch_size": 20,  # 在 Transformer 模型中，批量大小是指在神经网络的单次向前和向后传递过程中并行处理
+            # 的输入示例（序列）的数量。 它是训练模型时可以调整的超参数，是训练效率和性能的关键因素。
             "max_gradient_norm": 0.01,
             "num_heads": 4,
             "stack_size": 1,

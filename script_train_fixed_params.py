@@ -20,7 +20,7 @@ Uses default parameters supplied from the configs file to train a TFT model from
 scratch.
 
 Usage:
-python3 script_train_fixed_params {expt_name} {output_folder}
+python3 -m script_train_fixed_params {expt_name} {output_folder}
 
 Command line args:
   expt_name: Name of dataset/experiment to train.
