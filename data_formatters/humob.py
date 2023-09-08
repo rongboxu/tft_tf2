@@ -55,7 +55,7 @@ class HumobFormatter(GenericDataFormatter):
 
     _column_definition = [
         ("uid", DataTypes.REAL_VALUED, InputTypes.ID),  # 用户唯一ID
-        ("datatime", DataTypes.DATE, InputTypes.TIME),  # 时间的指标
+        ("timestamp", DataTypes.DATE, InputTypes.TIME),  # 时间的指标
         # ("poi", DataTypes.REAL_VALUED, InputTypes.KNOWN_INPUT),  # 待定为poi相关变量
         (
             "d",
@@ -203,12 +203,14 @@ class HumobFormatter(GenericDataFormatter):
         df_list = []
         for identifier, sliced in df.groupby(id_col):
             # Filter out any trajectories that are too short
+            print(f"Length of original sliced: {len(sliced)}")
             if len(sliced) >= self._time_steps:
                 sliced_copy = sliced.copy()
                 sliced_copy[real_inputs] = self._real_scalers[identifier].transform(
                     sliced_copy[real_inputs].values
                 )
                 df_list.append(sliced_copy)
+                print(f"Length of current {identifier} in df_list: {len(sliced_copy)}")
 
         output = pd.concat(df_list, axis=0)
 
@@ -254,10 +256,10 @@ class HumobFormatter(GenericDataFormatter):
         """Returns fixed model parameters for experiments."""
 
         fixed_params = {
-            "total_time_steps": 75 * 48,  # 作为有效数据的最低时间点数量，对三个数据集同样
+            "total_time_steps": 7 * 48,  # 作为有效数据的最低时间点数量，对三个数据集同样
             # 需要学习的过去的时间点数 + 需要预测的时间点数
             # 需要补全”不动“的时间戳
-            "num_encoder_steps": 60 * 48,
+            "num_encoder_steps": 6 * 48,
             "num_epochs": 100,
             "early_stopping_patience": 5,
             "multiprocessing_workers": 5,
