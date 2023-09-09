@@ -235,11 +235,12 @@ class HumobFormatter(GenericDataFormatter):
             raise ValueError("Scalers have not been set!")
 
         column_names = predictions.columns
-
         df_list = []
-        for identifier, sliced in predictions.groupby("identifier"):
+        print(column_names)
+ 
+        for identifier, sliced in predictions.groupby('identifier'):
             sliced_copy = sliced.copy()
-            target_scaler = self._target_scaler[identifier]
+            target_scaler = self._target_scaler['categorical_id']
 
             for col in column_names:
                 if col not in {"forecast_time", "identifier"}:

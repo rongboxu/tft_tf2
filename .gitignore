@@ -12,3 +12,5 @@ my_data/saved_models/electricity/fixed/results.csv
 my_data/saved_models/electricity/fixed/TemporalFusionTransformer.ckpt.data-00000-of-00001
 my_data/saved_models/electricity/fixed/TemporalFusionTransformer.ckpt.index
 my_data/saved_models/electricity/fixed/TemporalFusionTransformer.ckpt.meta
+__pycache__
+data

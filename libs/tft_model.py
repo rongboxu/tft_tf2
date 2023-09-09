@@ -708,6 +708,7 @@ class TemporalFusionTransformer(object):
             inputs[i, :, :] = sliced[input_cols]
             outputs[i, :, :] = sliced[[target_col]]
             time[i, :, 0] = sliced[time_col]
+            sliced = sliced.reset_index(drop=False)
             identifiers[i, :, 0] = sliced[id_col]
 
         sampled_data = {
@@ -766,8 +767,8 @@ class TemporalFusionTransformer(object):
 
             for k in col_mappings:
                 cols = col_mappings[k]
+                sliced['uid']=sliced.index
                 arr = _batch_single_entity(sliced[cols].copy())
-
                 if k not in data_map:
                     data_map[k] = [arr]
                 else:
