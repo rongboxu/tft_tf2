@@ -40,6 +40,11 @@ def get_single_col_by_input_type(input_type, column_definition):
 
   return l[0]
 
+#新增：修改该函数，使其能够处理多个目标列
+def get_cols_by_input_type(input_type, column_definition):
+    columns = [tup[0] for tup in column_definition if tup[2] == input_type]
+    return columns
+
 
 def extract_cols_from_data_type(data_type, column_definition,
                                 excluded_input_types):

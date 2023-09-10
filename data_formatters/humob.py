@@ -14,7 +14,7 @@
 # limitations under the License.
 
 # Lint as: python3
-"""Custom formatting functions for humob dataset.
+"""Custom formatting functions for Electricity dataset.
 
 Defines dataset specific column definitions and data transformations. Uses
 entity specific z-score normalization.
@@ -31,7 +31,7 @@ InputTypes = data_formatters.base.InputTypes
 
 
 class HumobFormatter(GenericDataFormatter):
-    """Defines and formats data for the humob dataset.
+    """Defines and formats data for the electricity dataset.
 
     Note that per-entity z-score normalization is used here, and is implemented
     across functions.
@@ -40,38 +40,15 @@ class HumobFormatter(GenericDataFormatter):
       column_definition: Defines input and data type of column used in the
         experiment.
       identifiers: Entity identifiers used in experiments.
-
-            (
-            "x",
-            DataTypes.REAL_VALUED,
-            InputTypes.TARGET,
-        ),  # 待定，这里是否应该(x,y)合为一个categorical变量
-        (
-            "y",
-            DataTypes.REAL_VALUED,
-            InputTypes.TARGET,
-        ),  # 待定，这里是否应该(x,y)合为一个categorical变量
     """
 
     _column_definition = [
-        ("uid", DataTypes.REAL_VALUED, InputTypes.ID),  # 用户唯一ID
-        ("datatime", DataTypes.DATE, InputTypes.TIME),  # 时间的指标
-        # ("poi", DataTypes.REAL_VALUED, InputTypes.KNOWN_INPUT),  # 待定为poi相关变量
-        (
-            "d",
-            DataTypes.REAL_VALUED,
-            InputTypes.KNOWN_INPUT,
-        ),  # 待定，tft貌似能吸收很多input变量
-        (
-            "location_id",
-            DataTypes.CATEGORICAL,
-            InputTypes.TARGET,
-        ),  # 地点ID
-        (
-            "categorical_id",
-            DataTypes.CATEGORICAL,
-            InputTypes.STATIC_INPUT,
-        ),  # 用户id作为静态输入
+        ("uid", DataTypes.REAL_VALUED, InputTypes.ID),
+        ("timestamp", DataTypes.REAL_VALUED, InputTypes.TIME),
+        ("d", DataTypes.REAL_VALUED, InputTypes.KNOWN_INPUT),
+        ("x", DataTypes.REAL_VALUED, InputTypes.TARGET),
+        ("y", DataTypes.REAL_VALUED, InputTypes.TARGET),
+        ("categorical_id", DataTypes.CATEGORICAL, InputTypes.STATIC_INPUT),
     ]
 
     def __init__(self):
@@ -80,21 +57,21 @@ class HumobFormatter(GenericDataFormatter):
         self.identifiers = None
         self._real_scalers = None
         self._cat_scalers = None
-        self._target_scaler = None
+        self._target_scaler_x = None
+        self._target_scaler_y = None
         self._num_classes_per_cat_input = None
         self._time_steps = self.get_fixed_params()["total_time_steps"]
 
+    # def split_data(self, df, valid_boundary=100, test_boundary=120):
     def split_data(self, df, valid_boundary=53, test_boundary=60):
         """Splits data frame into training-validation-test data frames.
-        按照时间维度划分而非用户维度, 相关资料见notion, 需讨论
-        0-74天
 
         This also calibrates scaling object, and transforms data for each split.
 
         Args:
           df: Source data frame to split.
-          valid_boundary: Starting day for validation data
-          test_boundary: Starting day for test data
+          valid_boundary: Starting year for validation data
+          test_boundary: Starting year for test data
 
         Returns:
           Tuple of transformed (train, valid, test) data.
@@ -102,7 +79,7 @@ class HumobFormatter(GenericDataFormatter):
 
         print("Formatting train-valid-test splits.")
 
-        index = df["d"]  # 因此需要保留原有的d column，这里需要依次做划分
+        index = df["d"]
         train = df.loc[index < valid_boundary]
         valid = df.loc[(index >= valid_boundary) & (index < test_boundary)]
         test = df.loc[(index >= test_boundary) & (index < 75)]
@@ -112,8 +89,7 @@ class HumobFormatter(GenericDataFormatter):
         return (self.transform_inputs(data) for data in [train, valid, test])
 
     def set_scalers(self, df):
-        """Calibrates scalers using the data supplied.
-        归一化
+        """Calibrates scalers using the data supplied. #归一化
 
         Args:
           df: Data to use to calibrate scalers.
@@ -124,9 +100,9 @@ class HumobFormatter(GenericDataFormatter):
         id_column = utils.get_single_col_by_input_type(
             InputTypes.ID, column_definitions
         )
-        # target_column = utils.get_single_col_by_input_type(
-        # InputTypes.TARGET, column_definitions
-        # )
+        target_columns = utils.get_cols_by_input_type(
+            InputTypes.TARGET, column_definitions
+        )
 
         # Format real scalers
         real_inputs = utils.extract_cols_from_data_type(
@@ -135,19 +111,24 @@ class HumobFormatter(GenericDataFormatter):
 
         # Initialise scaler caches
         self._real_scalers = {}
-        # self._target_scaler = {}
+        self._target_scaler_x = {}
+        self._target_scaler_y = {}
         identifiers = []
         for identifier, sliced in df.groupby(id_column):
             if len(sliced) >= self._time_steps:
+
+                #新增for双targets
+                self._target_scaler_x[identifier] = sklearn.preprocessing.StandardScaler().fit(sliced[["x"]].values)
+                self._target_scaler_y[identifier] = sklearn.preprocessing.StandardScaler().fit(sliced[["y"]].values)
+                
+                
                 data = sliced[real_inputs].values
-                # targets = sliced[[target_column]].values
+                targets_x = sliced[['x']].values
+                targets_y = sliced[['y']].values
                 self._real_scalers[
                     identifier
                 ] = sklearn.preprocessing.StandardScaler().fit(data)
 
-                # self._target_scaler[
-                # identifier
-                # ] = sklearn.preprocessing.StandardScaler().fit(targets)
             identifiers.append(identifier)
 
         # Format categorical scalers
@@ -167,7 +148,6 @@ class HumobFormatter(GenericDataFormatter):
 
         # Set categorical scaler outputs
         self._cat_scalers = categorical_scalers
-        self._target_scaler = categorical_scalers
         self._num_classes_per_cat_input = num_classes
 
         # Extract identifiers in case required
@@ -203,12 +183,14 @@ class HumobFormatter(GenericDataFormatter):
         df_list = []
         for identifier, sliced in df.groupby(id_col):
             # Filter out any trajectories that are too short
+            print(f"Length of original sliced: {len(sliced)}")
             if len(sliced) >= self._time_steps:
                 sliced_copy = sliced.copy()
                 sliced_copy[real_inputs] = self._real_scalers[identifier].transform(
                     sliced_copy[real_inputs].values
                 )
                 df_list.append(sliced_copy)
+                print(f"Length of current {identifier} in df_list: {len(sliced_copy)}")
 
         output = pd.concat(df_list, axis=0)
 
@@ -229,20 +211,24 @@ class HumobFormatter(GenericDataFormatter):
           Data frame of unnormalised predictions.
         """
 
-        if self._target_scaler is None:
+        if self._target_scaler_x is None or self._target_scaler_y is None:
             raise ValueError("Scalers have not been set!")
 
-        column_names = predictions.columns
-
+        #column_names = predictions.columns
         df_list = []
+        
+
         for identifier, sliced in predictions.groupby("identifier"):
             sliced_copy = sliced.copy()
-            target_scaler = self._target_scaler[identifier]
+            target_scaler_x = self._target_scaler_x[identifier]
+            target_scaler_y = self._target_scaler_x[identifier]
+            sliced_copy["x"] = target_scaler_x.inverse_transform(sliced_copy[["x"]].values)
+            sliced_copy["y"] = target_scaler_y.inverse_transform(sliced_copy[["y"]].values)
 
-            for col in column_names:
-                if col not in {"forecast_time", "identifier"}:
-                    reshaped_data = sliced_copy[col].values.reshape(-1, 1)
-                    sliced_copy[col] = target_scaler.inverse_transform(reshaped_data)
+            #for col in column_names:
+                #if col not in {"forecast_time", "identifier"}:
+                    #reshaped_data = sliced_copy[col].values.reshape(-1, 1)
+                    #sliced_copy[col] = target_scaler.inverse_transform(reshaped_data)
             df_list.append(sliced_copy)
 
         output = pd.concat(df_list, axis=0)
@@ -254,10 +240,8 @@ class HumobFormatter(GenericDataFormatter):
         """Returns fixed model parameters for experiments."""
 
         fixed_params = {
-            "total_time_steps": 75 * 48,  # 作为有效数据的最低时间点数量，对三个数据集同样
-            # 需要学习的过去的时间点数 + 需要预测的时间点数
-            # 需要补全”不动“的时间戳
-            "num_encoder_steps": 60 * 48,
+            "total_time_steps": 7 * 48,
+            "num_encoder_steps": 6 * 48,
             "num_epochs": 100,
             "early_stopping_patience": 5,
             "multiprocessing_workers": 5,
@@ -272,8 +256,7 @@ class HumobFormatter(GenericDataFormatter):
             "dropout_rate": 0.1,
             "hidden_layer_size": 160,
             "learning_rate": 0.001,
-            "minibatch_size": 20,  # 在 Transformer 模型中，批量大小是指在神经网络的单次向前和向后传递过程中并行处理
-            # 的输入示例（序列）的数量。 它是训练模型时可以调整的超参数，是训练效率和性能的关键因素。
+            "minibatch_size": 20,
             "max_gradient_norm": 0.01,
             "num_heads": 4,
             "stack_size": 1,

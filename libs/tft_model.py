@@ -609,7 +609,7 @@ class TemporalFusionTransformer(object):
     def _get_single_col_by_type(self, input_type):
         """Returns name of single column for input type."""
 
-        return utils.get_single_col_by_input_type(input_type, self.column_definition)
+        return utils.get_cols_by_input_type(input_type, self.column_definition)
 
     def training_data_cached(self):
         """Returns boolean indicating if training data has been cached."""
@@ -652,8 +652,11 @@ class TemporalFusionTransformer(object):
 
         id_col = self._get_single_col_by_type(InputTypes.ID)
         time_col = self._get_single_col_by_type(InputTypes.TIME)
+    
 
-        data.sort_values(by=[id_col, time_col], inplace=True)
+        #data.sort_values(by=[id_col, time_col], inplace=True)
+        data.sort_values(by=[id_col[0], time_col[0]], inplace=True)
+
 
         print("Getting valid sampling locations.")
         valid_sampling_locations = []
@@ -691,7 +694,8 @@ class TemporalFusionTransformer(object):
 
         id_col = self._get_single_col_by_type(InputTypes.ID)
         time_col = self._get_single_col_by_type(InputTypes.TIME)
-        target_col = self._get_single_col_by_type(InputTypes.TARGET)
+        #target_col = self._get_single_col_by_type(InputTypes.TARGET)
+        target_cols = ["x", "y"]
         input_cols = [
             tup[0]
             for tup in self.column_definition
@@ -706,9 +710,11 @@ class TemporalFusionTransformer(object):
                 start_idx - self.time_steps : start_idx
             ]
             inputs[i, :, :] = sliced[input_cols]
-            outputs[i, :, :] = sliced[[target_col]]
-            time[i, :, 0] = sliced[time_col]
-            identifiers[i, :, 0] = sliced[id_col]
+            #outputs[i, :, :] = sliced[[target_col]]
+            outputs[i, :, :2] = sliced[target_cols].values
+            time[i, :, 0] = sliced[time_col].squeeze()
+            sliced = sliced.reset_index(drop=False)
+            identifiers[i, :, 0] = sliced[id_col].squeeze()
 
         sampled_data = {
             "inputs": inputs,
@@ -766,8 +772,8 @@ class TemporalFusionTransformer(object):
 
             for k in col_mappings:
                 cols = col_mappings[k]
+                sliced['uid']=sliced.index
                 arr = _batch_single_entity(sliced[cols].copy())
-
                 if k not in data_map:
                     data_map[k] = [arr]
                 else:
@@ -1277,6 +1283,14 @@ class TemporalFusionTransformer(object):
             inputs, workers=16, use_multiprocessing=True, batch_size=self.minibatch_size
         )
 
+        print(combined)
+        df_combined = pd.DataFrame(combined)
+
+        # 保存为CSV文件
+        df_combined.to_csv('C:/Users/44595/OneDrive/personal_project/tft_tf2/combined_output.csv', index=False)
+        print("CSV saved successfully!") 
+
+
         # Format output_csv
         if self.output_size != 1:
             raise NotImplementedError("Current version only supports 1D targets!")
@@ -1311,6 +1325,8 @@ class TemporalFusionTransformer(object):
             process_map["targets"] = outputs
 
         return {k: format_outputs(process_map[k]) for k in process_map}
+    
+    
 
     def get_attention(self, df):
         """Computes TFT attention weights for a given dataset.
