@@ -48,12 +48,14 @@ ModelClass = libs.tft_model.TemporalFusionTransformer
 tf.experimental.output_all_intermediates(True)
 
 
-def main(expt_name,
-         use_gpu,
-         model_folder,
-         data_csv_path,
-         data_formatter,
-         use_testing_mode=False):
+def main(
+    expt_name,
+    use_gpu,
+    model_folder,
+    data_csv_path,
+    data_formatter,
+    use_testing_mode=False,
+):
     """Trains tft based on defined model params.
 
     Args:
@@ -71,8 +73,9 @@ def main(expt_name,
 
     if not isinstance(data_formatter, data_formatters.base.GenericDataFormatter):
         raise ValueError(
-            "Data formatters should inherit from" +
-            "AbstractDataFormatter! Type={}".format(type(data_formatter)))
+            "Data formatters should inherit from"
+            + "AbstractDataFormatter! Type={}".format(type(data_formatter))
+        )
 
     # Tensorflow setup
     default_keras_session = tf.keras.backend.get_session()
@@ -103,8 +106,9 @@ def main(expt_name,
 
     # Sets up hyperparam manager
     print("*** Loading hyperparm manager ***")
-    opt_manager = HyperparamOptManager({k: [params[k]] for k in params},
-                                       fixed_params, model_folder)
+    opt_manager = HyperparamOptManager(
+        {k: [params[k]] for k in params}, fixed_params, model_folder
+    )
 
     # Training -- one iteration only
     print("*** Running calibration ***")
@@ -114,10 +118,8 @@ def main(expt_name,
 
     best_loss = np.Inf
     for _ in range(num_repeats):
-
         tf.reset_default_graph()
         with tf.Graph().as_default(), tf.Session(config=tf_config) as sess:
-
             tf.keras.backend.set_session(sess)
 
             params = opt_manager.get_next_parameters()
@@ -158,17 +160,20 @@ def main(expt_name,
 
         def extract_numerical_data(data):
             """Strips out forecast time and identifier columns."""
-            return data[[
-                col for col in data.columns
-                if col not in {"forecast_time", "identifier"}
-            ]]
+            return data[
+                [
+                    col
+                    for col in data.columns
+                    if col not in {"forecast_time", "identifier"}
+                ]
+            ]
 
         p50_loss = utils.numpy_normalised_quantile_loss(
-            extract_numerical_data(targets), extract_numerical_data(p50_forecast),
-            0.5)
+            extract_numerical_data(targets), extract_numerical_data(p50_forecast), 0.5
+        )
         p90_loss = utils.numpy_normalised_quantile_loss(
-            extract_numerical_data(targets), extract_numerical_data(p90_forecast),
-            0.9)
+            extract_numerical_data(targets), extract_numerical_data(p90_forecast), 0.9
+        )
 
         tf.keras.backend.set_session(default_keras_session)
 
@@ -179,11 +184,24 @@ def main(expt_name,
     for k in best_params:
         print(k, " = ", best_params[k])
     print()
-    print("Normalised Quantile Loss for Test Data: P50={}, P90={}".format(
-        p50_loss.mean(), p90_loss.mean()))
+    print(
+        "Normalised Quantile Loss for Test Data: P50={}, P90={}".format(
+            p50_loss.mean(), p90_loss.mean()
+        )
+    )
+
+    print("Exporting forecast results...")
+    p50_forecast.to_csv(
+        os.path.join(model_folder, "results_p50_forecast.csv"), p50_forecast
+    )
+
+    p90_forecast.to_csv(
+        os.path.join(model_folder, "results_p90_forecast.csv"), p90_forecast
+    )
 
 
 if __name__ == "__main__":
+
     def get_args():
         """Gets settings from command line."""
 
@@ -197,14 +215,16 @@ if __name__ == "__main__":
             nargs="?",
             default="volatility",
             choices=experiment_names,
-            help="Experiment Name. Default={}".format(",".join(experiment_names)))
+            help="Experiment Name. Default={}".format(",".join(experiment_names)),
+        )
         parser.add_argument(
             "output_folder",
             metavar="f",
             type=str,
             nargs="?",
             default=".",
-            help="Path to folder for data download")
+            help="Path to folder for data download",
+        )
         parser.add_argument(
             "use_gpu",
             metavar="g",
@@ -212,14 +232,14 @@ if __name__ == "__main__":
             nargs="?",
             choices=["yes", "no"],
             default="no",
-            help="Whether to use gpu for training.")
+            help="Whether to use gpu for training.",
+        )
 
         args = parser.parse_known_args()[0]
 
         root_folder = None if args.output_folder == "." else args.output_folder
 
         return args.expt_name, root_folder, args.use_gpu == "yes"
-
 
     name, output_folder, use_tensorflow_with_gpu = get_args()
 
@@ -235,4 +255,5 @@ if __name__ == "__main__":
         model_folder=os.path.join(config.model_folder, "fixed"),
         data_csv_path=config.data_csv_path,
         data_formatter=formatter,
-        use_testing_mode=True)  # Change to false to use original default params
+        use_testing_mode=True,
+    )
