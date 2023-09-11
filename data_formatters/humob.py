@@ -64,7 +64,7 @@ class HumobFormatter(GenericDataFormatter):
         ),  # 待定，tft貌似能吸收很多input变量
         (
             "location_id",
-            DataTypes.CATEGORICAL,
+            DataTypes.REAL_VALUED,
             InputTypes.TARGET,
         ),  # 地点ID
         (
@@ -124,9 +124,9 @@ class HumobFormatter(GenericDataFormatter):
         id_column = utils.get_single_col_by_input_type(
             InputTypes.ID, column_definitions
         )
-        # target_column = utils.get_single_col_by_input_type(
-        # InputTypes.TARGET, column_definitions
-        # )
+        target_column = utils.get_single_col_by_input_type(
+            InputTypes.TARGET, column_definitions
+        )
 
         # Format real scalers
         real_inputs = utils.extract_cols_from_data_type(
@@ -135,19 +135,19 @@ class HumobFormatter(GenericDataFormatter):
 
         # Initialise scaler caches
         self._real_scalers = {}
-        # self._target_scaler = {}
+        self._target_scaler = {}
         identifiers = []
         for identifier, sliced in df.groupby(id_column):
             if len(sliced) >= self._time_steps:
                 data = sliced[real_inputs].values
-                # targets = sliced[[target_column]].values
+                targets = sliced[[target_column]].values
                 self._real_scalers[
                     identifier
                 ] = sklearn.preprocessing.StandardScaler().fit(data)
 
-                # self._target_scaler[
-                # identifier
-                # ] = sklearn.preprocessing.StandardScaler().fit(targets)
+                self._target_scaler[
+                    identifier
+                ] = sklearn.preprocessing.StandardScaler().fit(targets)
             identifiers.append(identifier)
 
         # Format categorical scalers
@@ -167,7 +167,7 @@ class HumobFormatter(GenericDataFormatter):
 
         # Set categorical scaler outputs
         self._cat_scalers = categorical_scalers
-        self._target_scaler = categorical_scalers
+        # self._target_scaler = categorical_scalers
         self._num_classes_per_cat_input = num_classes
 
         # Extract identifiers in case required
@@ -236,11 +236,10 @@ class HumobFormatter(GenericDataFormatter):
 
         column_names = predictions.columns
         df_list = []
-        print(column_names)
- 
-        for identifier, sliced in predictions.groupby('identifier'):
+
+        for identifier, sliced in predictions.groupby("identifier"):
             sliced_copy = sliced.copy()
-            target_scaler = self._target_scaler['categorical_id']
+            target_scaler = self._target_scaler[identifier]
 
             for col in column_names:
                 if col not in {"forecast_time", "identifier"}:
