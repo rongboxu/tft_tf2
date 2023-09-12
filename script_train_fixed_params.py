@@ -191,13 +191,9 @@ def main(
     )
 
     print("Exporting forecast results...")
-    p50_forecast.to_csv(
-        os.path.join(model_folder, "results_p50_forecast.csv"), p50_forecast
-    )
+    p50_forecast.to_csv(os.path.join(model_folder, "results_p50_forecast.csv"))
 
-    p90_forecast.to_csv(
-        os.path.join(model_folder, "results_p90_forecast.csv"), p90_forecast
-    )
+    p90_forecast.to_csv(os.path.join(model_folder, "results_p90_forecast.csv"))
 
 
 if __name__ == "__main__":

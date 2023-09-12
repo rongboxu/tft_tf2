@@ -256,10 +256,10 @@ class HumobFormatter(GenericDataFormatter):
         """Returns fixed model parameters for experiments."""
 
         fixed_params = {
-            "total_time_steps": 7 * 48,  # 作为有效数据的最低时间点数量，对三个数据集同样
+            "total_time_steps": 8 * 48,  # 作为有效数据的最低时间点数量，对三个数据集同样
             # 需要学习的过去的时间点数 + 需要预测的时间点数
             # 需要补全”不动“的时间戳
-            "num_encoder_steps": 6 * 48,
+            "num_encoder_steps": 1 * 48,
             "num_epochs": 100,
             "early_stopping_patience": 5,
             "multiprocessing_workers": 5,
