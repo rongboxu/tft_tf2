@@ -787,8 +787,9 @@ class TemporalFusionTransformer(object):
             if data_map[k]:
                 data_map[k] = np.concatenate(data_map[k], axis=0)
             else:
-                data_map[k] = np.array([])
-
+                if k == "outputs":
+                    data_map[k] = np.empty((0, self.num_encoder_steps, len(input_cols)))
+                    
         # Shorten target so we only get decoder steps
         data_map["outputs"] = data_map["outputs"][:, self.num_encoder_steps :, :]
 
