@@ -82,6 +82,8 @@ def main(
 
     if use_gpu:
         tf_config = utils.get_default_tensorflow_config(tf_device="gpu", gpu_id=0)
+        tf_config.log_device_placement = True
+        print("TF Config:", tf_config)
 
     else:
         tf_config = utils.get_default_tensorflow_config(tf_device="cpu")
@@ -149,12 +151,13 @@ def main(
 
         model.load(opt_manager.hyperparam_folder)
 
-        print("Computing best validation loss")
-        val_loss = model.evaluate(valid)
+        # print("Computing best validation loss")
+        # val_loss = model.evaluate(valid)
 
-        print("Computing test loss")
+        # print("Computing test loss")
         output_map = model.predict(test, return_targets=True)
-        targets = data_formatter.format_predictions(output_map["targets"])
+        # targets = data_formatter.format_predictions(output_map["targets"])
+        print("Computing p50_forecast")
         p50_forecast = data_formatter.format_predictions(output_map["p50"])
         p90_forecast = data_formatter.format_predictions(output_map["p90"])
 
@@ -168,12 +171,12 @@ def main(
                 ]
             ]
 
-        p50_loss = utils.numpy_normalised_quantile_loss(
-            extract_numerical_data(targets), extract_numerical_data(p50_forecast), 0.5
-        )
-        p90_loss = utils.numpy_normalised_quantile_loss(
-            extract_numerical_data(targets), extract_numerical_data(p90_forecast), 0.9
-        )
+        # p50_loss = utils.numpy_normalised_quantile_loss(
+        #     extract_numerical_data(targets), extract_numerical_data(p50_forecast), 0.5
+        # )
+        # p90_loss = utils.numpy_normalised_quantile_loss(
+        #     extract_numerical_data(targets), extract_numerical_data(p90_forecast), 0.9
+        # )
 
         tf.keras.backend.set_session(default_keras_session)
 
@@ -184,11 +187,11 @@ def main(
     for k in best_params:
         print(k, " = ", best_params[k])
     print()
-    print(
-        "Normalised Quantile Loss for Test Data: P50={}, P90={}".format(
-            p50_loss.mean(), p90_loss.mean()
-        )
-    )
+    # print(
+    #     "Normalised Quantile Loss for Test Data: P50={}, P90={}".format(
+    #         p50_loss.mean(), p90_loss.mean()
+    #     )
+    # )
 
     print("Exporting forecast results...")
     p50_forecast.to_csv(os.path.join(model_folder, "results_p50_forecast.csv"))
