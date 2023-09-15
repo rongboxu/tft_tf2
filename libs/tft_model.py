@@ -724,13 +724,15 @@ class TemporalFusionTransformer(object):
     def _batch_data2(self, df):
         def batch_generator(data, batch_size):
             """Generator function to yield batches of data."""
-            for i in range(0, len(data), batch_size):
-                yield data.iloc[i:i+batch_size]
+            for i in range(0, len(data), batch_size*15*48):
+                a = batch_size*15*48
+                yield data.iloc[i:i+a]
                 
         def _batch_single_entity(input_data):
             time_steps = len(input_data)
             lags = self.time_steps
             x = input_data.values
+            print(time_steps,lags)
             if time_steps >= lags:
                 return np.stack(
                     [x[i : time_steps - (lags - 1) + i, :] for i in range(lags)], axis=1
@@ -774,12 +776,12 @@ class TemporalFusionTransformer(object):
                 }
 
                 for k in col_mappings:
-                    # print(k)
                     cols = col_mappings[k]
+                    sliced['uid']=sliced.index
+                    arr = _batch_single_entity(sliced[cols].copy())
                     if k not in data_map:
-                        data_map[k] = []
-                    arr = _batch_single_entity(sliced.reset_index()[cols])
-                    if arr is not None:
+                        data_map[k] = [arr]
+                    else:
                         data_map[k].append(arr)
 
         # Combine all data from batches
@@ -789,7 +791,7 @@ class TemporalFusionTransformer(object):
             else:
                 if k == "outputs":
                     data_map[k] = np.empty((0, self.num_encoder_steps, len(input_cols)))
-                    
+
         # Shorten target so we only get decoder steps
         data_map["outputs"] = data_map["outputs"][:, self.num_encoder_steps :, :]
 
@@ -1332,6 +1334,88 @@ class TemporalFusionTransformer(object):
 
         return metrics[eval_metric]
 
+    # def predict(self, df, return_targets=False):
+    #     """Computes predictions for a given input dataset.
+
+    #     Args:
+    #       df: Input dataframe
+    #       return_targets: Whether to also return outputs aligned with predictions to
+    #         faciliate evaluation
+
+    #     Returns:
+    #       Input dataframe or tuple of (input dataframe, algined output dataframe).
+    #     """
+    #     # Define function to split dataframe into batches
+    #     def batch_splitter(df, batch_size):
+    #         n = len(df)
+    #         for i in range(0, n, batch_size):
+    #             yield df.iloc[i:i+batch_size]
+
+    #     batch_size = 64
+
+    #     batched_results = []
+    #     # Add a batch counter
+    #     batch_counter = 1
+    #     total_batches = len(df) // batch_size + (len(df) % batch_size > 0)
+
+    #     for batch in batch_splitter(df, batch_size):
+    #         print(f"Processing batch {batch_counter} of {total_batches}")
+    #         batch_counter += 1
+
+    #         data = self._batch_data2(df)
+
+    #         inputs = data["inputs"]
+    #         time = data["time"]
+    #         identifier = data["identifier"]
+    #         outputs = data["outputs"]
+
+    #         combined = self.model.predict(
+    #             inputs, workers=16, use_multiprocessing=True, batch_size=batch_size
+    #         )
+
+    #         # Format output_csv
+    #         if self.output_size != 1:
+    #             raise NotImplementedError("Current version only supports 1D targets!")
+
+    #         def format_outputs(prediction):
+    #             """Returns formatted dataframes for prediction."""
+
+    #             flat_prediction = pd.DataFrame(
+    #                 prediction[:, :, 0],
+    #                 columns=[
+    #                     "t+{}".format(i)
+    #                     for i in range(self.time_steps - self.num_encoder_steps)
+    #                 ],
+    #             )
+    #             cols = list(flat_prediction.columns)
+    #             flat_prediction["forecast_time"] = time[:, self.num_encoder_steps - 1, 0]
+    #             flat_prediction["identifier"] = identifier[:, 0, 0]
+
+    #             # Arrange in order
+    #             return flat_prediction[["forecast_time", "identifier"] + cols]
+
+    #         # Extract predictions for each quantile into different entries
+    #         process_map = {
+    #             "p{}".format(int(q * 100)): combined[
+    #                 Ellipsis, i * self.output_size : (i + 1) * self.output_size
+    #             ]
+    #             for i, q in enumerate(self.quantiles)
+    #         }
+
+    #         if return_targets:
+    #             # Add targets if relevant
+    #             process_map["targets"] = outputs
+            
+    #         batched_results.append({k: format_outputs(process_map[k]) for k in process_map})
+    #      # Combine all batched results
+    #     final_result = {}
+    #     for key in batched_results[0]:
+    #         final_result[key] = pd.concat([batch[key] for batch in batched_results], ignore_index=True)
+
+    #     return final_result
+
+    #     # return {k: format_outputs(process_map[k]) for k in process_map}
+
     def predict(self, df, return_targets=False):
         """Computes predictions for a given input dataset.
 
@@ -1343,76 +1427,53 @@ class TemporalFusionTransformer(object):
         Returns:
           Input dataframe or tuple of (input dataframe, algined output dataframe).
         """
-        # Define function to split dataframe into batches
-        def batch_splitter(df, batch_size):
-            n = len(df)
-            for i in range(0, n, batch_size):
-                yield df.iloc[i:i+batch_size]
 
-        batch_size = 64
+        data = self._batch_data2(df)
+        print(data['inputs'])
 
-        batched_results = []
-        # Add a batch counter
-        batch_counter = 1
-        total_batches = len(df) // batch_size + (len(df) % batch_size > 0)
+        inputs = data["inputs"]
+        time = data["time"]
+        identifier = data["identifier"]
+        outputs = data["outputs"]
 
-        for batch in batch_splitter(df, batch_size):
-            print(f"Processing batch {batch_counter} of {total_batches}")
-            batch_counter += 1
+        combined = self.model.predict(
+            inputs, workers=16, use_multiprocessing=True, batch_size=self.minibatch_size
+        )
 
-            data = self._batch_data2(df)
+        # Format output_csv
+        if self.output_size != 1:
+            raise NotImplementedError("Current version only supports 1D targets!")
 
-            inputs = data["inputs"]
-            time = data["time"]
-            identifier = data["identifier"]
-            outputs = data["outputs"]
+        def format_outputs(prediction):
+            """Returns formatted dataframes for prediction."""
 
-            combined = self.model.predict(
-                inputs, workers=16, use_multiprocessing=True, batch_size=batch_size
+            flat_prediction = pd.DataFrame(
+                prediction[:, :, 0],
+                columns=[
+                    "t+{}".format(i)
+                    for i in range(self.time_steps - self.num_encoder_steps)
+                ],
             )
+            cols = list(flat_prediction.columns)
+            flat_prediction["forecast_time"] = time[:, self.num_encoder_steps - 1, 0]
+            flat_prediction["identifier"] = identifier[:, 0, 0]
 
-            # Format output_csv
-            if self.output_size != 1:
-                raise NotImplementedError("Current version only supports 1D targets!")
+            # Arrange in order
+            return flat_prediction[["forecast_time", "identifier"] + cols]
 
-            def format_outputs(prediction):
-                """Returns formatted dataframes for prediction."""
+        # Extract predictions for each quantile into different entries
+        process_map = {
+            "p{}".format(int(q * 100)): combined[
+                Ellipsis, i * self.output_size : (i + 1) * self.output_size
+            ]
+            for i, q in enumerate(self.quantiles)
+        }
 
-                flat_prediction = pd.DataFrame(
-                    prediction[:, :, 0],
-                    columns=[
-                        "t+{}".format(i)
-                        for i in range(self.time_steps - self.num_encoder_steps)
-                    ],
-                )
-                cols = list(flat_prediction.columns)
-                flat_prediction["forecast_time"] = time[:, self.num_encoder_steps - 1, 0]
-                flat_prediction["identifier"] = identifier[:, 0, 0]
+        if return_targets:
+            # Add targets if relevant
+            process_map["targets"] = outputs
 
-                # Arrange in order
-                return flat_prediction[["forecast_time", "identifier"] + cols]
-
-            # Extract predictions for each quantile into different entries
-            process_map = {
-                "p{}".format(int(q * 100)): combined[
-                    Ellipsis, i * self.output_size : (i + 1) * self.output_size
-                ]
-                for i, q in enumerate(self.quantiles)
-            }
-
-            if return_targets:
-                # Add targets if relevant
-                process_map["targets"] = outputs
-            
-            batched_results.append({k: format_outputs(process_map[k]) for k in process_map})
-         # Combine all batched results
-        final_result = {}
-        for key in batched_results[0]:
-            final_result[key] = pd.concat([batch[key] for batch in batched_results], ignore_index=True)
-
-        return final_result
-
-        # return {k: format_outputs(process_map[k]) for k in process_map}
+        return {k: format_outputs(process_map[k]) for k in process_map}
 
     def get_attention(self, df):
         """Computes TFT attention weights for a given dataset.

@@ -274,7 +274,7 @@ class HumobFormatter(GenericDataFormatter):
             "dropout_rate": 0.1,
             "hidden_layer_size": 160,
             "learning_rate": 0.001,
-            "minibatch_size": 20,  # 在 Transformer 模型中，批量大小是指在神经网络的单次向前和向后传递过程中并行处理
+            "minibatch_size": 1000,  # 在 Transformer 模型中，批量大小是指在神经网络的单次向前和向后传递过程中并行处理
             # 的输入示例（序列）的数量。 它是训练模型时可以调整的超参数，是训练效率和性能的关键因素。
             "max_gradient_norm": 0.01,
             "num_heads": 4,
